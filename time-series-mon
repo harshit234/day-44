@@ -531,3 +531,56 @@ except Exception as e:
     sarima_metrics = arima_metrics
     sarima_preds   = arima_preds
     SARIMA_OK = False
+
+try:
+    from prophet import Prophet
+    PROPHET_AVAILABLE = True
+except ImportError:
+    PROPHET_AVAILABLE = False
+
+prophet_metrics = None
+prophet_preds   = None
+
+if PROPHET_AVAILABLE:
+
+    # Explicitly rename the index to 'ds' and the series to 'y'
+    prophet_train = train_series.reset_index()
+    prophet_train.columns = ['ds', 'y']
+
+    prophet_model = Prophet(
+        yearly_seasonality=True,
+        weekly_seasonality=True,
+        daily_seasonality=False,
+        seasonality_mode='multiplicative',
+        interval_width=0.95,
+        changepoint_prior_scale=0.05
+    )
+
+    indian_holidays = pd.DataFrame({
+        'holiday': 'india_ecomm_sales',
+        'ds': pd.to_datetime([
+            '2016-10-12', '2017-10-19', '2018-10-10',
+            '2016-11-10', '2017-10-19', '2018-11-07',
+        ]),
+        'lower_window': -3,
+        'upper_window': 3,
+    })
+
+    try:
+        prophet_model.add_country_holidays(country_name='IN')
+    except Exception:
+        prophet_model.holidays = indian_holidays
+
+    prophet_model.fit(prophet_train)
+
+    future = prophet_model.make_future_dataframe(periods=HOLDOUT_WEEKS, freq='W')
+    forecast = prophet_model.predict(future)
+
+    prophet_preds = forecast.set_index('ds')['yhat'].tail(HOLDOUT_WEEKS)
+    prophet_metrics = evaluate_forecast(test_series, prophet_preds.values, 'Prophet')
+
+    fig = prophet_model.plot_components(forecast)
+    plt.savefig('plots/07_prophet_components.png', dpi=120, bbox_inches='tight')
+    plt.show()
+else:
+    print("Prophet not available — skipping. SARIMA is the seasonal model.")
