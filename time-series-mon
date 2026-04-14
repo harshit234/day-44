@@ -209,3 +209,31 @@ acf_vals = acf(diff_series, nlags=10)
 pacf_vals = pacf(diff_series, nlags=10, method='ywm')
 for lag in range(1, 6):
     print(f"  Lag {lag:2d} — ACF: {acf_vals[lag]:+.3f}   PACF: {pacf_vals[lag]:+.3f}")
+
+SENSOR_PATH = Path("/content/sensor.csv")
+
+def load_sensor_data(path: Path) -> pd.DataFrame:
+ 
+    df = pd.read_csv(path)
+
+    ts_candidates = ['timestamp', 'Timestamp', 'time', 'datetime', 'date']
+    ts_col = next((c for c in ts_candidates if c in df.columns), None)
+
+    if ts_col:
+        df[ts_col] = pd.to_datetime(df[ts_col])
+        df = df.set_index(ts_col).sort_index()
+        print(f"  Timestamp column: '{ts_col}'")
+    else:
+      
+        df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0])
+        df = df.set_index(df.columns[0]).sort_index()
+
+    print(f"  Shape         : {df.shape}")
+    print(f"  Time range    : {df.index.min()} → {df.index.max()}")
+    print(f"  Columns       : {df.columns.tolist()[:10]}{'...' if len(df.columns)>10 else ''}")
+    return df
+
+sensor_raw = load_sensor_data(SENSOR_PATH)
+print(f"\nData types:\n{sensor_raw.dtypes.value_counts()}")
+print(f"\nFirst 3 rows:")
+sensor_raw.head(3)
