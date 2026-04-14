@@ -731,3 +731,37 @@ clf = GradientBoostingClassifier(
 print("\nFitting Gradient Boosting classifier...")
 clf.fit(X_train_sc, y_train)
 print("Done.")
+
+y_proba = clf.predict_proba(X_test_sc)[:, 1]
+y_pred  = (y_proba >= DECISION_THRESHOLD).astype(int)
+
+print(f"\n Sensor Failure-Risk Model — Evaluation")
+print(f"  Decision threshold : {DECISION_THRESHOLD}")
+print(f"  (Lower than 0.50 to maximise Recall — asymmetric cost)")
+print()
+print(classification_report(y_test, y_pred,
+                             target_names=['Normal', 'Failure Risk'],
+                             digits=3))
+
+auc = roc_auc_score(y_test, y_proba)
+f1  = f1_score(y_test, y_pred)
+print(f"  AUC-ROC : {auc:.4f}")
+print(f"  F1-score: {f1:.4f}")
+
+
+cm = confusion_matrix(y_test, y_pred)
+fig, ax = plt.subplots(figsize=(5, 4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
+            xticklabels=['Pred Normal', 'Pred Failure'],
+            yticklabels=['Actual Normal', 'Actual Failure'])
+ax.set_title(f'Confusion Matrix (threshold={DECISION_THRESHOLD})')
+plt.tight_layout()
+plt.savefig('plots/09_sensor_confusion_matrix.png', dpi=120, bbox_inches='tight')
+plt.show()
+
+tn, fp, fn, tp = cm.ravel()
+recall_failure = tp / (tp + fn + 1e-9)
+print(f"\n  True Positives  (caught failures)    : {tp}")
+print(f"  False Negatives (missed failures)    : {fn}  ← MINIMISE THIS")
+print(f"  False Positives (unnecessary alerts) : {fp}")
+print(f"  Recall on failures                   : {recall_failure:.3f}")
