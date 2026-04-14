@@ -393,3 +393,16 @@ def plot_sensor_overview(df: pd.DataFrame, n_signals: int = 4) -> None:
 
 os.makedirs('plots', exist_ok=True)
 plot_sensor_overview(sensor_clean)
+
+HOLDOUT_WEEKS = 12  
+
+series = ecomm_weekly['sales'].dropna()
+
+train_series = series.iloc[:-HOLDOUT_WEEKS]
+test_series  = series.iloc[-HOLDOUT_WEEKS:]
+
+print(f"Train : {train_series.index.min().date()} → {train_series.index.max().date()} "
+      f"({len(train_series)} weeks)")
+print(f"Test  : {test_series.index.min().date()} → {test_series.index.max().date()} "
+      f"({len(test_series)} weeks)")
+print(f"\nNo random split used — temporal ordering preserved ")
