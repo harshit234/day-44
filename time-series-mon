@@ -133,3 +133,35 @@ ecomm = clean_ecommerce(ecomm_raw)
 
 ecomm_weekly = ecomm.resample('W').sum()
 print(f"Weekly aggregation: {len(ecomm_weekly)} weeks")
+
+def run_stationarity_tests(series: pd.Series, series_name: str = 'series') -> dict:
+
+    series_clean = series.dropna()
+
+    adf_stat, adf_p, _, _, adf_crit, _ = adfuller(series_clean, autolag='AIC')
+    kpss_stat, kpss_p, _, kpss_crit = kpss(series_clean, regression='ct', nlags='auto')
+
+    print(f"\n Stationarity Tests — {series_name}")
+    print(f"{'─'*50}")
+    print(f"ADF  statistic : {adf_stat:.4f}  |  p-value: {adf_p:.4f}")
+    print(f"     Critical 5%: {adf_crit['5%']:.4f}")
+    adf_conclusion = 'STATIONARY' if adf_p < 0.05 else 'NON-STATIONARY'
+    print(f"     → ADF conclusion: {adf_conclusion} (p {'<' if adf_p < 0.05 else '≥'} 0.05)")
+
+    print(f"\nKPSS statistic : {kpss_stat:.4f}  |  p-value (bounds): {kpss_p:.4f}")
+    print(f"     Critical 5%: {kpss_crit['5%']:.4f}")
+    kpss_conclusion = 'NON-STATIONARY' if kpss_stat > kpss_crit['5%'] else 'STATIONARY'
+    print(f"     → KPSS conclusion: {kpss_conclusion}")
+
+    return {
+        'adf_p': adf_p, 'adf_stationary': adf_p < 0.05,
+        'kpss_stat': kpss_stat, 'kpss_stationary': kpss_stat <= kpss_crit['5%']
+    }
+
+
+stat_results_level = run_stationarity_tests(ecomm_weekly['sales'], 'Weekly Sales (level)')
+
+
+ecomm_weekly['sales_diff1'] = ecomm_weekly['sales'].diff()
+stat_results_diff1 = run_stationarity_tests(
+    ecomm_weekly['sales_diff1'].dropna(), 'Weekly Sales (1st difference)'
