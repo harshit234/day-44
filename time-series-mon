@@ -68,3 +68,42 @@ print(f"Date range    : {ecomm_raw.index.min().date()} → {ecomm_raw.index.max(
 print(f"Frequency     : {pd.infer_freq(ecomm_raw.index) or 'mixed / not inferred'}")
 print(f"\nDescriptive statistics:")
 print(ecomm_raw['sales'].describe().round(2))
+
+def audit_time_series(df: pd.DataFrame, series_col: str = 'sales') -> dict:
+    findings = {}
+
+    n_missing = df[series_col].isna().sum()
+    findings['n_missing'] = n_missing
+
+    
+    n_dupes = df.index.duplicated().sum()
+    findings['n_duplicates'] = n_dupes
+
+    
+    full_range = pd.date_range(df.index.min(), df.index.max(), freq='D')
+    missing_dates = full_range.difference(df.index)
+    findings['missing_dates_count'] = len(missing_dates)
+    findings['missing_dates_sample'] = missing_dates[:5].tolist()
+
+    
+    n_non_positive = (df[series_col] <= 0).sum()
+    findings['n_non_positive'] = n_non_positive
+
+    
+    q1, q3 = df[series_col].quantile([0.25, 0.75])
+    iqr = q3 - q1
+    outlier_mask = (df[series_col] < q1 - 3 * iqr) | (df[series_col] > q3 + 3 * iqr)
+    findings['n_outliers_iqr3'] = outlier_mask.sum()
+
+    print("\n Data Quality Audit — E-Commerce Sales")
+    print(f"  Missing values      : {n_missing}")
+    print(f"  Duplicate dates     : {n_dupes}")
+    print(f"  Calendar gaps       : {len(missing_dates)} days missing")
+    if len(missing_dates) > 0:
+        print(f"    Sample missing    : {[str(d.date()) for d in missing_dates[:5]]}")
+    print(f"  Non-positive values : {n_non_positive}")
+    print(f"  Outliers (3×IQR)    : {outlier_mask.sum()}")
+    return findings, outlier_mask
+
+
+audit_findings, outlier_mask = audit_time_series(ecomm_raw)
