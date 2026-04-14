@@ -441,3 +441,42 @@ print(f"\nFitting ARIMA{best_order} on training data...")
 arima_model = ARIMA(train_series, order=best_order)
 arima_fit   = arima_model.fit()
 print(arima_fit.summary())
+
+def evaluate_forecast(y_true: pd.Series, y_pred: np.ndarray,
+                      model_name: str = 'Model') -> dict:
+    
+    mae  = mean_absolute_error(y_true, y_pred)
+    # Fixed: manual sqrt for RMSE to avoid version-specific 'squared' argument errors
+    mse  = mean_squared_error(y_true, y_pred)
+    rmse = np.sqrt(mse)
+    mape = mean_absolute_percentage_error(y_true, y_pred) * 100
+
+    print(f"\n {model_name} — Forecast Evaluation (hold-out: {len(y_true)} weeks)")
+    print(f"  MAE  : {mae:,.2f}  ← average weekly forecast error (same unit as sales)")
+    print(f"  RMSE : {rmse:,.2f}  ← penalises large misses more than MAE")
+    print(f"  MAPE : {mape:.2f}%  ← percentage error (inventory: target < 15%)")
+    return {'model': model_name, 'MAE': mae, 'RMSE': rmse, 'MAPE': mape}
+
+
+
+arima_preds = arima_fit.forecast(steps=HOLDOUT_WEEKS)
+arima_ci    = arima_fit.get_forecast(steps=HOLDOUT_WEEKS).conf_int()
+
+arima_metrics = evaluate_forecast(test_series, arima_preds, 'ARIMA Baseline')
+
+fig, ax = plt.subplots(figsize=(14, 5))
+ax.plot(train_series.index[-26:], train_series.iloc[-26:],
+        color='steelblue', linewidth=1.4, label='Train (last 26w)')
+ax.plot(test_series.index, test_series,
+        color='black', linewidth=1.8, label='Actual')
+ax.plot(test_series.index, arima_preds,
+        color='crimson', linewidth=2, linestyle='--', label='ARIMA Forecast')
+ax.fill_between(test_series.index,
+                arima_ci.iloc[:, 0], arima_ci.iloc[:, 1],
+                alpha=0.18, color='crimson', label='95% CI')
+ax.axvline(test_series.index[0], color='grey', linestyle=':', linewidth=1.5)
+ax.set_title(f'ARIMA{best_order} Forecast — Hold-out = {HOLDOUT_WEEKS} weeks', fontsize=13)
+ax.set_ylabel('Weekly Sales'); ax.legend()
+plt.tight_layout()
+plt.savefig('plots/05_arima_forecast.png', dpi=120, bbox_inches='tight')
+plt.show()
