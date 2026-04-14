@@ -291,6 +291,51 @@ def audit_timestamp_quality(df: pd.DataFrame) -> dict:
         'n_irregular': n_irregular,
         'n_large_gaps': n_large_gaps
     }
-
-
 ts_quality = audit_timestamp_quality(sensor_raw)
+
+def clean_sensor_data(df: pd.DataFrame, audit: pd.DataFrame,
+                      high_missing_thresh: float = 0.30) -> pd.DataFrame:
+
+    df = df.copy()
+    original_shape = df.shape
+
+    
+    n_dupes = df.index.duplicated().sum()
+    if n_dupes > 0:
+        df = df[~df.index.duplicated(keep='first')]
+        print(f"  [1] Removed {n_dupes} duplicate timestamps")
+
+    
+    drop_cols = audit[audit['pct_missing'] > high_missing_thresh * 100].index.tolist()
+    if drop_cols:
+        df = df.drop(columns=drop_cols, errors='ignore')
+        print(f"  [2] Dropped {len(drop_cols)} high-missing columns: {drop_cols[:5]}")
+
+    
+    n_inf = np.isinf(df.select_dtypes('number')).sum().sum()
+    if n_inf > 0:
+        df = df.replace([np.inf, -np.inf], np.nan)
+        print(f"  [3] Replaced {n_inf} Inf values with NaN")
+
+    
+    df = df.interpolate(method='linear', limit=10)
+    df = df.ffill().bfill()
+    print(f"  [4/5] Interpolated and forward/backward filled missing values")
+
+    
+    for col in df.select_dtypes('number').columns:
+        stuck_mask = df[col].diff() == 0
+        if stuck_mask.sum() > len(df) * 0.05:
+            df[f'{col}_stuck_flag'] = stuck_mask.astype(int)
+    stuck_flag_cols = [c for c in df.columns if c.endswith('_stuck_flag')]
+    if stuck_flag_cols:
+        print(f"  [6] Added {len(stuck_flag_cols)} stuck-sensor flag columns")
+
+    final_missing = df.select_dtypes('number').isna().sum().sum()
+    print(f"\n   Clean: {original_shape} → {df.shape}")
+    print(f"     Remaining NaNs in numeric columns: {final_missing}")
+    return df
+
+
+sensor_clean = clean_sensor_data(sensor_raw, audit_df)
+print(f"\nFinal clean sensor shape: {sensor_clean.shape}")
