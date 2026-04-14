@@ -406,3 +406,38 @@ print(f"Train : {train_series.index.min().date()} → {train_series.index.max().
 print(f"Test  : {test_series.index.min().date()} → {test_series.index.max().date()} "
       f"({len(test_series)} weeks)")
 print(f"\nNo random split used — temporal ordering preserved ")
+
+def select_arima_order(series: pd.Series,
+                       p_range: range = range(0, 4),
+                       d: int = 1,
+                       q_range: range = range(0, 4)) -> tuple:
+
+    best_aic = np.inf
+    best_order = (1, d, 1)
+    results = []
+
+    for p in p_range:
+        for q in q_range:
+            try:
+                model = ARIMA(series, order=(p, d, q))
+                fit   = model.fit()
+                results.append({'p': p, 'd': d, 'q': q, 'AIC': fit.aic})
+                if fit.aic < best_aic:
+                    best_aic   = fit.aic
+                    best_order = (p, d, q)
+            except Exception:
+                pass
+
+    results_df = pd.DataFrame(results).sort_values('AIC').head(5)
+    print("Top 5 ARIMA orders by AIC:")
+    print(results_df.to_string(index=False))
+    print(f"\n→ Selected order: ARIMA{best_order} (AIC = {best_aic:.2f})")
+    return best_order
+
+
+best_order = select_arima_order(train_series)
+print(f"\nFitting ARIMA{best_order} on training data...")
+
+arima_model = ARIMA(train_series, order=best_order)
+arima_fit   = arima_model.fit()
+print(arima_fit.summary())
