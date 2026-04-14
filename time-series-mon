@@ -765,3 +765,39 @@ print(f"\n  True Positives  (caught failures)    : {tp}")
 print(f"  False Negatives (missed failures)    : {fn}  ← MINIMISE THIS")
 print(f"  False Positives (unnecessary alerts) : {fp}")
 print(f"  Recall on failures                   : {recall_failure:.3f}")
+
+scaler = StandardScaler()
+X_train_sc = scaler.fit_transform(X_train)
+X_test_sc = scaler.transform(X_test)
+
+# 2. Train Model
+RANDOM_SEED = 42
+DECISION_THRESHOLD = 0.35
+
+clf = GradientBoostingClassifier(
+    n_estimators=200,
+    max_depth=4,
+    learning_rate=0.05,
+    subsample=0.8,
+    random_state=RANDOM_SEED
+)
+
+print("Fitting Gradient Boosting classifier...")
+clf.fit(X_train_sc, y_train)
+print("Model training complete.")
+
+# 3. Compute and plot feature importance
+importances = pd.Series(clf.feature_importances_, index=feature_cols)
+top15 = importances.nlargest(15)
+
+fig, ax = plt.subplots(figsize=(10, 6))
+top15.sort_values().plot.barh(ax=ax, color='steelblue', edgecolor='white')
+ax.set_xlabel('Feature Importance (Gini)')
+ax.set_title('Top 15 Features — Sensor Failure Risk Model', fontsize=12)
+plt.tight_layout()
+plt.savefig('plots/10_feature_importance.png', dpi=120, bbox_inches='tight')
+plt.show()
+
+print("\nTop 5 predictive features:")
+for feat, imp in top15.head(5).items():
+    print(f"  {feat:<35} importance = {imp:.4f}")
