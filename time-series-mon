@@ -237,3 +237,35 @@ sensor_raw = load_sensor_data(SENSOR_PATH)
 print(f"\nData types:\n{sensor_raw.dtypes.value_counts()}")
 print(f"\nFirst 3 rows:")
 sensor_raw.head(3)
+
+def audit_sensor_data(df: pd.DataFrame) -> pd.DataFrame:
+    numeric_cols = df.select_dtypes(include='number').columns
+    rows = []
+    for col in numeric_cols:
+        s = df[col]
+        rows.append({
+            'column': col,
+            'dtype': str(s.dtype),
+            'n_missing': s.isna().sum(),
+            'pct_missing': round(s.isna().mean() * 100, 2),
+            'n_zeros': (s == 0).sum(),
+            'n_negative': (s < 0).sum(),
+            'n_inf': np.isinf(s).sum(),
+            'n_dupes_consec': (s.diff() == 0).sum(),
+            'min': s.min(), 'max': s.max(),
+            'std': round(float(s.std()), 4),
+            'n_outliers_3iqr': ((s < s.quantile(0.25) - 3*(s.quantile(0.75)-s.quantile(0.25))) |
+                                (s > s.quantile(0.75) + 3*(s.quantile(0.75)-s.quantile(0.25)))).sum()
+        })
+    summary = pd.DataFrame(rows).set_index('column')
+    return summary
+
+audit_df = audit_sensor_data(sensor_raw)
+
+print("\n Sensor Data Quality — Column Summary")
+print(audit_df.head().to_string())
+
+HIGH_MISSING = audit_df[audit_df['pct_missing'] > 30].index.tolist()
+HAS_INF      = audit_df[audit_df['n_inf'] > 0].index.tolist()
+HAS_NEG      = audit_df[audit_df['n_negative'] > 0].index.tolist()
+STUCK        = audit_df[audit_df['n_dupes_consec'] > len(sensor_raw) * 0.05].index.tolist()
