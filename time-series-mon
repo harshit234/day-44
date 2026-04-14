@@ -480,3 +480,30 @@ ax.set_ylabel('Weekly Sales'); ax.legend()
 plt.tight_layout()
 plt.savefig('plots/05_arima_forecast.png', dpi=120, bbox_inches='tight')
 plt.show()
+
+residuals = pd.Series(arima_fit.resid)
+
+fig, axes = plt.subplots(1, 3, figsize=(16, 4))
+
+axes[0].plot(residuals.values, linewidth=0.8)
+axes[0].axhline(0, color='crimson', linestyle='--')
+axes[0].set_title('Residuals over time')
+
+axes[1].hist(residuals, bins=30, color='steelblue', edgecolor='white')
+axes[1].set_title('Residual distribution')
+
+plot_acf(residuals.dropna(), lags=20, ax=axes[2], title='ACF of Residuals')
+
+plt.suptitle('ARIMA Residual Diagnostics', fontsize=13)
+plt.tight_layout()
+plt.savefig('plots/06_arima_residuals.png', dpi=120, bbox_inches='tight')
+plt.show()
+
+
+acf_resid = acf(residuals.dropna(), nlags=20)
+sig_lags  = [i for i, v in enumerate(acf_resid[1:], 1) if abs(v) > 2/np.sqrt(len(residuals))]
+print(f"Residual ACF significant lags: {sig_lags}")
+if any(l % 52 == 0 for l in sig_lags) or max(sig_lags, default=0) >= 10:
+    print("→ Seasonal pattern in residuals detected → SARIMA/Prophet warranted (Sub-step 4)")
+else:
+    print("→ Residuals look white-noise-like — ARIMA captures most structure")
