@@ -636,3 +636,60 @@ ax.set_ylabel('Weekly Sales'); ax.legend()
 plt.tight_layout()
 plt.savefig('plots/08_forecast_comparison.png', dpi=120, bbox_inches='tight')
 plt.show()
+
+SENSOR_COLS     = [c for c in sensor_clean.select_dtypes('number').columns
+                   if not c.endswith('_flag') and c != 'failure_label']
+
+
+SENSOR_COLS = SENSOR_COLS[:10]
+
+def engineer_sensor_features(df: pd.DataFrame,
+                              sensor_cols: list,
+                              windows: list = [5, 15, 60]) -> pd.DataFrame:
+ 
+    feat = df[sensor_cols].copy()
+
+    for col in sensor_cols:
+        for w in windows:
+            feat[f'{col}_rmean_{w}']  = df[col].rolling(w, min_periods=1).mean()
+            feat[f'{col}_rstd_{w}']   = df[col].rolling(w, min_periods=1).std().fillna(0)
+            feat[f'{col}_rmin_{w}']   = df[col].rolling(w, min_periods=1).min()
+            feat[f'{col}_rmax_{w}']   = df[col].rolling(w, min_periods=1).max()
+
+        feat[f'{col}_diff1']  = df[col].diff().fillna(0)
+        feat[f'{col}_diff2']  = df[col].diff().diff().fillna(0)  # acceleration
+
+        rolling_m = df[col].rolling(60, min_periods=1).mean()
+        rolling_s = df[col].rolling(60, min_periods=1).std().fillna(1).replace(0, 1)
+        feat[f'{col}_zscore'] = (df[col] - rolling_m) / rolling_s
+
+  
+    flag_cols = [c for c in df.columns if c.endswith('_stuck_flag')]
+    for fc in flag_cols:
+        feat[fc] = df[fc]
+
+    return feat
+
+
+sensor_features = engineer_sensor_features(sensor_clean, SENSOR_COLS)
+
+
+freq_seconds = pd.Series(sensor_clean.index).diff().dt.total_seconds().median()
+readings_per_hour = max(1, int(3600 / freq_seconds))
+HORIZON = readings_per_hour * 24   # number of steps in 24 hours
+
+sensor_features['failure_label'] = sensor_clean['failure_label']
+
+sensor_features['target'] = (
+    sensor_clean['failure_label']
+    .rolling(HORIZON, min_periods=1)
+    .max()
+    .shift(-HORIZON)
+    .fillna(0)
+    .astype(int)
+)
+
+sensor_features = sensor_features.dropna()
+print(f"Features shape : {sensor_features.shape}")
+print(f"Horizon        : {HORIZON} readings = 24 hours")
+print(f"Failure rate   : {sensor_features['target'].mean():.2%}")
