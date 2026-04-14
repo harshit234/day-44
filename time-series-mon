@@ -693,3 +693,19 @@ sensor_features = sensor_features.dropna()
 print(f"Features shape : {sensor_features.shape}")
 print(f"Horizon        : {HORIZON} readings = 24 hours")
 print(f"Failure rate   : {sensor_features['target'].mean():.2%}")
+
+SPLIT_RATIO = 0.80
+split_idx   = int(len(sensor_features) * SPLIT_RATIO)
+
+feature_cols = [c for c in sensor_features.columns
+                if c not in ('target', 'failure_label')]
+
+X_train = sensor_features.iloc[:split_idx][feature_cols]
+y_train = sensor_features.iloc[:split_idx]['target']
+X_test  = sensor_features.iloc[split_idx:][feature_cols]
+y_test  = sensor_features.iloc[split_idx:]['target']
+
+print(f"Train: {split_idx:,} rows  |  Test: {len(X_test):,} rows")
+print(f"Train failure rate: {y_train.mean():.2%}")
+print(f"Test  failure rate: {y_test.mean():.2%}")
+print("\nTemporal split only — no shuffle applied ")
