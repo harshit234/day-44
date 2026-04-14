@@ -801,3 +801,52 @@ plt.show()
 print("\nTop 5 predictive features:")
 for feat, imp in top15.head(5).items():
     print(f"  {feat:<35} importance = {imp:.4f}")
+
+def format_maintenance_alert(proba: float, threshold: float = 0.35) -> str:
+  
+    if proba >= 0.70:
+        level = 'CRITICAL'   ; action = 'Immediate inspection required'
+    elif proba >= 0.50:
+        level = 'HIGH'       ; action = 'Schedule inspection within 4 hours'
+    elif proba >= threshold:
+        level = 'ELEVATED'   ; action = 'Monitor closely — inspect by end of shift'
+    else:
+        level = 'NORMAL'     ; action = 'No action required'
+    return f"{level}  |  24h failure prob: {proba:.1%}  |  Action: {action}"
+
+
+print("\n Maintenance Team — Equipment Risk Dashboard (last 10 readings)")
+print("=" * 75)
+for ts, proba in zip(
+    sensor_features.index[split_idx: split_idx + 10],
+    y_proba[:10]
+):
+    print(f"  {ts}  |  {format_maintenance_alert(proba)}")
+
+print("""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋  SUB-STEP 5 SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MODEL: Gradient Boosting Classifier
+  Chosen because: handles imbalanced, tabular, sequential features;
+  built-in feature importance for maintenance team explanation.
+
+FEATURES: Rolling statistics (mean/std over 5,15,60-step windows),
+  rate-of-change (diff1/diff2), z-score from rolling baseline,
+  stuck-sensor flags.
+
+EVALUATION METRIC: Recall (primary)
+  A missed failure triggers emergency repair — estimated 10–50×
+  more costly than a false alarm inspection. Recall maximisation
+  directly minimises the most expensive error.
+  Secondary: AUC-ROC (model discrimination), F1 (balance check).
+
+THRESHOLD: 0.35 (below default 0.50)
+  Shifts decision boundary to catch more failures at the cost of
+  more false alarms — correct trade-off given asymmetric costs.
+
+MAINTENANCE PRESENTATION: 4-level risk scale (CRITICAL/HIGH/
+  ELEVATED/NORMAL) mapped from raw probability — no model jargon.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+""")
