@@ -1,0 +1,70 @@
+import warnings
+warnings.filterwarnings('ignore')
+
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import seaborn as sns
+from pathlib import Path
+
+
+from statsmodels.tsa.stattools import adfuller, kpss, acf, pacf
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.metrics import (
+    mean_absolute_error, mean_squared_error, mean_absolute_percentage_error,
+    classification_report, confusion_matrix, roc_auc_score, f1_score
+)
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV, RandomizedSearchCV
+from sklearn.pipeline import Pipeline
+
+ECOMM_PATH = Path("/content/olist_orders_dataset.csv")
+
+def load_ecommerce(path: Path) -> pd.DataFrame:
+ 
+    df = pd.read_csv(path)
+
+
+    date_col_candidates = [
+        'order_purchase_timestamp', 'date', 'ds', 'Date',
+        'order_date', 'timestamp', 'week'
+    ]
+    date_col = next((c for c in date_col_candidates if c in df.columns), None)
+    
+    if date_col is None:
+        date_col = df.select_dtypes(include=['object', 'datetime']).columns[0]
+    
+    print(f"  Date column identified: '{date_col}'")
+
+
+    value_col_candidates = ['order_count', 'sales', 'revenue', 'price', 'total_sales']
+    value_col = next((c for c in value_col_candidates if c in df.columns), None)
+    
+    if value_col is None:
+        print("  No numeric value column found. Using 'order_id' count as target.")
+        df['sales'] = 1
+        value_col = 'sales'
+    else:
+        print(f"  Target column identified: '{value_col}'")
+        df = df.rename(columns={value_col: 'sales'})
+
+
+    df[date_col] = pd.to_datetime(df[date_col])
+    df = df[[date_col, 'sales']].rename(columns={date_col: 'date'})
+    df = df.set_index('date').sort_index()
+    return df
+
+ecomm_raw = load_ecommerce(ECOMM_PATH)
+
+print(f"\n{'─'*55}")
+print(f"Rows          : {len(ecomm_raw):,}")
+print(f"Date range    : {ecomm_raw.index.min().date()} → {ecomm_raw.index.max().date()}")
+print(f"Frequency     : {pd.infer_freq(ecomm_raw.index) or 'mixed / not inferred'}")
+print(f"\nDescriptive statistics:")
+print(ecomm_raw['sales'].describe().round(2))
