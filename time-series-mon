@@ -269,3 +269,28 @@ HIGH_MISSING = audit_df[audit_df['pct_missing'] > 30].index.tolist()
 HAS_INF      = audit_df[audit_df['n_inf'] > 0].index.tolist()
 HAS_NEG      = audit_df[audit_df['n_negative'] > 0].index.tolist()
 STUCK        = audit_df[audit_df['n_dupes_consec'] > len(sensor_raw) * 0.05].index.tolist()
+
+def audit_timestamp_quality(df: pd.DataFrame) -> dict:
+ 
+    diffs = pd.Series(df.index).diff().dt.total_seconds().dropna()
+    expected_freq_sec = diffs.mode()[0]
+
+    n_duplicates  = df.index.duplicated().sum()
+    n_irregular   = (diffs != expected_freq_sec).sum()
+    n_large_gaps  = (diffs > expected_freq_sec * 5).sum()  
+
+    print(f"\n Timestamp Quality Audit")
+    print(f"  Expected frequency : {expected_freq_sec:.0f} seconds")
+    print(f"  Duplicate timestamps: {n_duplicates}")
+    print(f"  Irregular intervals : {n_irregular}")
+    print(f"  Large gaps (>5× freq): {n_large_gaps}")
+
+    return {
+        'freq_sec': expected_freq_sec,
+        'n_duplicates': n_duplicates,
+        'n_irregular': n_irregular,
+        'n_large_gaps': n_large_gaps
+    }
+
+
+ts_quality = audit_timestamp_quality(sensor_raw)
