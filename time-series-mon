@@ -165,3 +165,47 @@ stat_results_level = run_stationarity_tests(ecomm_weekly['sales'], 'Weekly Sales
 ecomm_weekly['sales_diff1'] = ecomm_weekly['sales'].diff()
 stat_results_diff1 = run_stationarity_tests(
     ecomm_weekly['sales_diff1'].dropna(), 'Weekly Sales (1st difference)'
+
+SEASONAL_PERIOD = 52   
+
+
+cv = ecomm_weekly['sales'].std() / ecomm_weekly['sales'].mean()
+decomp_model = 'multiplicative' if cv > 0.15 else 'additive'
+print(f"CV = {cv:.3f} → using {decomp_model} decomposition")
+
+decomp = seasonal_decompose(
+    ecomm_weekly['sales'].dropna(),
+    model=decomp_model,
+    period=SEASONAL_PERIOD,
+    extrapolate_trend='freq'
+)
+
+fig, axes = plt.subplots(4, 1, figsize=(14, 11), sharex=True)
+labels = ['Observed', 'Trend', 'Seasonal', 'Residual']
+components = [decomp.observed, decomp.trend, decomp.seasonal, decomp.resid]
+colors = ['steelblue', 'crimson', 'forestgreen', 'darkorange']
+
+for ax, comp, label, color in zip(axes, components, labels, colors):
+    ax.plot(comp, color=color, linewidth=1.2)
+    ax.set_ylabel(label, fontsize=10)
+
+axes[0].set_title(f'STL-style Decomposition — Weekly Sales ({decomp_model})', fontsize=13)
+plt.tight_layout()
+plt.savefig('plots/02_ecomm_decomposition.png', dpi=120, bbox_inches='tight')
+plt.show()
+
+diff_series = ecomm_weekly['sales'].diff().dropna()
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 4))
+plot_acf(diff_series, lags=40, ax=ax1, title='ACF — 1st Differenced Weekly Sales')
+plot_pacf(diff_series, lags=40, ax=ax2, method='ywm',
+          title='PACF — 1st Differenced Weekly Sales')
+plt.tight_layout()
+plt.savefig('plots/03_ecomm_acf_pacf.png', dpi=120, bbox_inches='tight')
+plt.show()
+
+print("\n Key ACF/PACF readings:")
+acf_vals = acf(diff_series, nlags=10)
+pacf_vals = pacf(diff_series, nlags=10, method='ywm')
+for lag in range(1, 6):
+    print(f"  Lag {lag:2d} — ACF: {acf_vals[lag]:+.3f}   PACF: {pacf_vals[lag]:+.3f}")
