@@ -584,3 +584,36 @@ if PROPHET_AVAILABLE:
     plt.show()
 else:
     print("Prophet not available — skipping. SARIMA is the seasonal model.")
+
+all_metrics = [arima_metrics, sarima_metrics]
+if prophet_metrics:
+    all_metrics.append(prophet_metrics)
+
+comparison_df = pd.DataFrame(all_metrics).set_index('model')
+print("\n  Model Comparison — Same Hold-Out Set")
+print(comparison_df.round(2).to_string())
+
+
+baseline_mae = arima_metrics['MAE']
+print("\nRelative improvement over ARIMA baseline:")
+for _, row in comparison_df.iterrows():
+    if row.name == 'ARIMA Baseline':
+        continue
+    improvement = (baseline_mae - row['MAE']) / baseline_mae * 100
+    symbol = 'Yes' if improvement > 0 else 'No'
+    print(f"  {symbol} {row.name}: MAE improvement = {improvement:+.1f}%")
+
+print("""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋  SUB-STEP 4 DECISION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Complexity is justified if the seasonal model reduces MAE by >10%
+on the hold-out set — a threshold where the operational benefit
+(fewer stock-outs and overstock events) outweighs the added
+model maintenance burden.
+
+If SARIMA/Prophet MAE < 0.9 × ARIMA MAE  → adopt seasonal model
+If SARIMA/Prophet MAE ≥ 0.9 × ARIMA MAE  → keep ARIMA (simpler, more robust)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+""")
