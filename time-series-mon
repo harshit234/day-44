@@ -709,3 +709,25 @@ print(f"Train: {split_idx:,} rows  |  Test: {len(X_test):,} rows")
 print(f"Train failure rate: {y_train.mean():.2%}")
 print(f"Test  failure rate: {y_test.mean():.2%}")
 print("\nTemporal split only — no shuffle applied ")
+
+scaler  = StandardScaler()
+X_train_sc = scaler.fit_transform(X_train)
+X_test_sc  = scaler.transform(X_test)
+
+
+failure_ratio  = y_train.mean()
+class_weight   = {0: 1, 1: max(1, int((1 - failure_ratio) / failure_ratio * 2))}
+print(f"Class weights: {class_weight}  (failure heavily upweighted)")
+
+
+clf = GradientBoostingClassifier(
+    n_estimators=200,
+    max_depth=4,
+    learning_rate=0.05,
+    subsample=0.8,
+    random_state=RANDOM_SEED
+)
+
+print("\nFitting Gradient Boosting classifier...")
+clf.fit(X_train_sc, y_train)
+print("Done.")
