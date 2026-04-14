@@ -507,3 +507,27 @@ if any(l % 52 == 0 for l in sig_lags) or max(sig_lags, default=0) >= 10:
     print("→ Seasonal pattern in residuals detected → SARIMA/Prophet warranted (Sub-step 4)")
 else:
     print("→ Residuals look white-noise-like — ARIMA captures most structure")
+
+SARIMA_ORDER         = best_order          
+SARIMA_SEASONAL      = (1, 1, 0, 52)      
+
+print(f"Fitting SARIMA{SARIMA_ORDER}×{SARIMA_SEASONAL} ...")
+print("(This may take 30-60 seconds for weekly data)")
+
+try:
+    sarima_model = SARIMAX(
+        train_series,
+        order=SARIMA_ORDER,
+        seasonal_order=SARIMA_SEASONAL,
+        enforce_stationarity=False,
+        enforce_invertibility=False
+    )
+    sarima_fit = sarima_model.fit(disp=False)
+    sarima_preds = sarima_fit.forecast(steps=HOLDOUT_WEEKS)
+    sarima_metrics = evaluate_forecast(test_series, sarima_preds, 'SARIMA (Seasonal)')
+    SARIMA_OK = True
+except Exception as e:
+    print(f" SARIMA failed: {e}\nFalling back to ARIMA metrics for comparison.")
+    sarima_metrics = arima_metrics
+    sarima_preds   = arima_preds
+    SARIMA_OK = False
